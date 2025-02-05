@@ -1,32 +1,89 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { FileUpload } from "@/components/FileUpload";
 import { AudioControls } from "@/components/AudioControls";
 import { toast } from "sonner";
+import { textToSpeech } from "@/utils/elevenlabs";
+import * as pdfjs from 'pdfjs-dist';
+
+// Initialize PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [volume, setVolume] = useState(1);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  const handleFileSelect = (file: File) => {
-    setSelectedFile(file);
-    toast.success("PDF uploaded successfully!");
+  const extractTextFromPDF = async (file: File): Promise<string> => {
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      let fullText = '';
+      
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items
+          .map((item: any) => item.str)
+          .join(' ');
+        fullText += pageText + ' ';
+      }
+      
+      return fullText;
+    } catch (error) {
+      console.error('Error extracting text from PDF:', error);
+      throw error;
+    }
+  };
+
+  const handleFileSelect = async (file: File) => {
+    try {
+      setSelectedFile(file);
+      toast.success("PDF uploaded successfully!");
+      
+      const text = await extractTextFromPDF(file);
+      const audioUrl = await textToSpeech(text);
+      setAudioUrl(audioUrl);
+      
+      if (audioRef.current) {
+        audioRef.current.src = audioUrl;
+        audioRef.current.load();
+      }
+    } catch (error) {
+      toast.error("Error processing PDF");
+      console.error(error);
+    }
   };
 
   const handlePlayPause = () => {
-    setIsPlaying(!isPlaying);
+    if (audioRef.current) {
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play();
+      }
+      setIsPlaying(!isPlaying);
+    }
   };
 
   const handleSkipBack = () => {
-    // Implement skip back functionality
+    if (audioRef.current) {
+      audioRef.current.currentTime -= 10;
+    }
   };
 
   const handleSkipForward = () => {
-    // Implement skip forward functionality
+    if (audioRef.current) {
+      audioRef.current.currentTime += 10;
+    }
   };
 
   const handleVolumeChange = (value: number) => {
     setVolume(value);
+    if (audioRef.current) {
+      audioRef.current.volume = value;
+    }
   };
 
   return (
@@ -52,6 +109,8 @@ const Index = () => {
           </div>
         )}
       </div>
+
+      <audio ref={audioRef} />
 
       <AudioControls
         isPlaying={isPlaying}
