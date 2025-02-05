@@ -8,7 +8,8 @@ export async function textToSpeech(text: string) {
       .eq('name', 'ELEVEN_LABS_API_KEY')
       .single();
 
-    if (secretError) throw new secretError;
+    if (secretError) throw secretError;
+    if (!secretData) throw new Error('API key not found');
 
     const VOICE_ID = "21m00Tcm4TlvDq8ikWAM"; // default voice
     const MODEL_ID = "eleven_monolingual_v1";
