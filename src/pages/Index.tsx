@@ -5,9 +5,8 @@ import { toast } from "sonner";
 import { textToSpeech } from "@/utils/elevenlabs";
 import * as pdfjs from 'pdfjs-dist';
 
-// Initialize PDF.js worker with a local path
-const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry');
-pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
+// Initialize PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
