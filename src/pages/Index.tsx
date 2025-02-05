@@ -4,9 +4,10 @@ import { AudioControls } from "@/components/AudioControls";
 import { toast } from "sonner";
 import { textToSpeech } from "@/utils/elevenlabs";
 import * as pdfjs from 'pdfjs-dist';
+import pdfjsWorker from 'pdfjs-dist/build/pdf.worker.min.js?url';
 
 // Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
