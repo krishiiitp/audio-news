@@ -105,7 +105,7 @@ const Index = () => {
       setSelectedFile(null);
       setExtractedText('');
       console.error('Processing Error:', error);
-      toast.error(error.message || 'Error processing PDF');
+      toast.error(error.message || 'Error processing PDF !');
     }
   };
 
