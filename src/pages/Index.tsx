@@ -1,12 +1,11 @@
+
 import { useState, useRef } from "react";
 import { FileUpload } from "@/components/FileUpload";
 import { AudioControls } from "@/components/AudioControls";
 import { toast } from "sonner";
 import { textToSpeech } from "@/utils/elevenlabs";
 import * as pdfjs from 'pdfjs-dist';
-
-// Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+import 'pdfjs-dist/build/pdf.worker.entry';
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

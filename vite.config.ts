@@ -1,3 +1,4 @@
+
 import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
@@ -18,13 +19,6 @@ export default defineConfig(({ mode }) => ({
     },
   },
   optimizeDeps: {
-    exclude: ['pdfjs-dist']
-  },
-  build: {
-    rollupOptions: {
-      external: [
-        'pdfjs-dist/build/pdf.worker.entry'
-      ]
-    }
+    include: ['pdfjs-dist']
   }
 }));
