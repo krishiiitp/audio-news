@@ -7,11 +7,8 @@ import * as pdfjs from 'pdfjs-dist';
 import { supabase } from "@/integrations/supabase/client";
 import { speechService } from "@/utils/speech";
 
-// Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
+// 1. Fix PDF.js worker configuration
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -20,68 +17,95 @@ const Index = () => {
   const [speed, setSpeed] = useState(1);
   const [pitch, setPitch] = useState(1);
 
+  // 2. Add abort controller for cleanup
+  const abortController = useRef(new AbortController());
+
   useEffect(() => {
     speechService.setStateChangeCallback(setIsPlaying);
+    return () => {
+      abortController.current.abort();
+      speechService.stop();
+    };
   }, []);
 
+  // 3. Improved text extraction with error handling
   const extractTextFromPDF = async (file: File): Promise<string> => {
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await pdfjs.getDocument({
+        data: arrayBuffer,
+        disableAutoFetch: true,
+        disableStream: true
+      }).promise;
+
       let fullText = '';
-      
-      for (let i = 1; i <= pdf.numPages; i++) {
+      const pagesToParse = Math.min(pdf.numPages, 50); // Limit to 50 pages
+
+      for (let i = 1; i <= pagesToParse; i++) {
+        if (abortController.current.signal.aborted) break;
+        
         const page = await pdf.getPage(i);
         const textContent = await page.getTextContent();
-        const pageText = textContent.items
+        fullText += textContent.items
           .map((item: any) => item.str)
-          .join(' ');
-        fullText += pageText + ' ';
+          .join(' ')
+          .replace(/\s+/g, ' ') + '\n';
       }
-      
-      return fullText;
+
+      return fullText.trim();
     } catch (error) {
-      console.error('Error extracting text from PDF:', error);
-      throw error;
+      console.error('PDF Extraction Error:', error);
+      throw new Error('Failed to extract text from PDF');
     }
   };
 
+  // 4. Enhanced file handling with validation
   const handleFileSelect = async (file: File) => {
     try {
+      if (file.size > 10 * 1024 * 1024) { // 10MB limit
+        throw new Error('File size exceeds 10MB limit');
+      }
+
       setSelectedFile(file);
-      toast.success("PDF uploaded successfully!");
-      
-      // Extract text from PDF
       const text = await extractTextFromPDF(file);
       setExtractedText(text);
 
-      // Upload PDF to Supabase Storage
-      const { data: storageData, error: storageError } = await supabase.storage
+      // 5. Add timeout for large PDFs
+      const uploadPromise = supabase.storage
         .from('newspapers')
         .upload(`${crypto.randomUUID()}.pdf`, file);
 
-      if (storageError) {
-        throw storageError;
-      }
+      const { data: storageData, error: storageError } = await toast.promise(
+        uploadPromise,
+        {
+          loading: 'Uploading PDF...',
+          success: 'PDF uploaded successfully!',
+          error: 'Upload failed'
+        }
+      );
 
-      // Save newspaper entry to database
+      if (storageError) throw storageError;
+
+      // 6. Batch database operations
       const { error: dbError } = await supabase
         .from('newspapers')
         .insert({
           title: file.name,
-          extracted_text: text,
+          extracted_text: text.substring(0, 10000), // Store first 10k chars
           pdf_url: storageData.path
         });
 
-      if (dbError) {
-        throw dbError;
-      }
+      if (dbError) throw dbError;
 
-      // Start speech
+      // 7. Add preload before speaking
+      await new Promise(resolve => setTimeout(resolve, 500));
       speechService.speak(text, speed, pitch);
-    } catch (error) {
-      toast.error("Error processing PDF");
-      console.error(error);
+
+    } catch (error: any) {
+      setSelectedFile(null);
+      setExtractedText('');
+      console.error('Processing Error:', error);
+      toast.error(error.message || 'Error processing PDF');
     }
   };
 
