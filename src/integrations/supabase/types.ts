@@ -9,6 +9,36 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      newspapers: {
+        Row: {
+          audio_url: string | null
+          extracted_text: string | null
+          id: string
+          pdf_url: string | null
+          title: string
+          uploaded_at: string
+          user_id: string | null
+        }
+        Insert: {
+          audio_url?: string | null
+          extracted_text?: string | null
+          id?: string
+          pdf_url?: string | null
+          title: string
+          uploaded_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          audio_url?: string | null
+          extracted_text?: string | null
+          id?: string
+          pdf_url?: string | null
+          title?: string
+          uploaded_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       secrets: {
         Row: {
           created_at: string
@@ -27,6 +57,33 @@ export type Database = {
           id?: string
           name?: string
           value?: string
+        }
+        Relationships: []
+      }
+      users: {
+        Row: {
+          created_at: string
+          email: string | null
+          id: string
+          theme: string | null
+          voice_pitch: number | null
+          voice_speed: number | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          id: string
+          theme?: string | null
+          voice_pitch?: number | null
+          voice_speed?: number | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          id?: string
+          theme?: string | null
+          voice_pitch?: number | null
+          voice_speed?: number | null
         }
         Relationships: []
       }

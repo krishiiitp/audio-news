@@ -1,10 +1,11 @@
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { FileUpload } from "@/components/FileUpload";
-import { AudioControls } from "@/components/AudioControls";
+import { VoiceControls } from "@/components/VoiceControls";
 import { toast } from "sonner";
-import { textToSpeech } from "@/utils/elevenlabs";
 import * as pdfjs from 'pdfjs-dist';
+import { supabase } from "@/integrations/supabase/client";
+import { speechService } from "@/utils/speech";
 
 // Initialize PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -15,9 +16,13 @@ pdfjs.GlobalWorkerOptions.workerSrc = new URL(
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(1);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [extractedText, setExtractedText] = useState<string>("");
+  const [speed, setSpeed] = useState(1);
+  const [pitch, setPitch] = useState(1);
+
+  useEffect(() => {
+    speechService.setStateChangeCallback(setIsPlaying);
+  }, []);
 
   const extractTextFromPDF = async (file: File): Promise<string> => {
     try {
@@ -46,14 +51,34 @@ const Index = () => {
       setSelectedFile(file);
       toast.success("PDF uploaded successfully!");
       
+      // Extract text from PDF
       const text = await extractTextFromPDF(file);
-      const audioUrl = await textToSpeech(text);
-      setAudioUrl(audioUrl);
-      
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        audioRef.current.load();
+      setExtractedText(text);
+
+      // Upload PDF to Supabase Storage
+      const { data: storageData, error: storageError } = await supabase.storage
+        .from('newspapers')
+        .upload(`${crypto.randomUUID()}.pdf`, file);
+
+      if (storageError) {
+        throw storageError;
       }
+
+      // Save newspaper entry to database
+      const { error: dbError } = await supabase
+        .from('newspapers')
+        .insert({
+          title: file.name,
+          extracted_text: text,
+          pdf_url: storageData.path
+        });
+
+      if (dbError) {
+        throw dbError;
+      }
+
+      // Start speech
+      speechService.speak(text, speed, pitch);
     } catch (error) {
       toast.error("Error processing PDF");
       console.error(error);
@@ -61,40 +86,44 @@ const Index = () => {
   };
 
   const handlePlayPause = () => {
-    if (audioRef.current) {
-      if (isPlaying) {
-        audioRef.current.pause();
-      } else {
-        audioRef.current.play();
+    if (isPlaying) {
+      speechService.pause();
+    } else {
+      if (extractedText) {
+        speechService.resume();
       }
-      setIsPlaying(!isPlaying);
     }
   };
 
   const handleSkipBack = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime -= 10;
+    // Reset and start from the beginning for now
+    // In a future iteration, we could implement more granular control
+    if (extractedText) {
+      speechService.speak(extractedText, speed, pitch);
     }
   };
 
   const handleSkipForward = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime += 10;
-    }
+    // For now, this just stops the current speech
+    // In a future iteration, we could implement more granular control
+    speechService.stop();
   };
 
-  const handleVolumeChange = (value: number) => {
-    setVolume(value);
-    if (audioRef.current) {
-      audioRef.current.volume = value;
-    }
+  const handleSpeedChange = (value: number) => {
+    setSpeed(value);
+    speechService.setSpeed(value);
+  };
+
+  const handlePitchChange = (value: number) => {
+    setPitch(value);
+    speechService.setPitch(value);
   };
 
   return (
     <div className="min-h-screen pb-24 page-transition">
       <div className="container max-w-4xl mx-auto py-12">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold mb-4">Newspaper Reader</h1>
+          <h1 className="text-4xl font-bold mb-4">Voice Newspaper</h1>
           <p className="text-lg text-muted-foreground">
             Upload your newspaper PDF and listen to it
           </p>
@@ -107,22 +136,25 @@ const Index = () => {
             <h2 className="text-xl font-semibold mb-4">
               {selectedFile.name}
             </h2>
-            <p className="text-muted-foreground">
-              Your PDF is ready to be read. Click play to start listening.
+            <p className="text-muted-foreground mb-4">
+              Your PDF is ready. Use the controls below to manage playback.
             </p>
+            <div className="max-h-96 overflow-y-auto p-4 bg-muted/50 rounded">
+              {extractedText}
+            </div>
           </div>
         )}
       </div>
 
-      <audio ref={audioRef} />
-
-      <AudioControls
+      <VoiceControls
         isPlaying={isPlaying}
         onPlayPause={handlePlayPause}
         onSkipBack={handleSkipBack}
         onSkipForward={handleSkipForward}
-        onVolumeChange={handleVolumeChange}
-        volume={volume}
+        onSpeedChange={handleSpeedChange}
+        onPitchChange={handlePitchChange}
+        speed={speed}
+        pitch={pitch}
       />
     </div>
   );
