@@ -7,7 +7,8 @@ import { textToSpeech } from "@/utils/elevenlabs";
 import * as pdfjs from 'pdfjs-dist';
 
 // Initialize PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.mjs');
+pdfjs.GlobalWorkerOptions.workerSrc = pdfjsWorker;
 
 const Index = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
