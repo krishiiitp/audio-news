@@ -1,4 +1,4 @@
-# audio-news# Welcome to your Lovable project
+# Welcome to your Lovable project
 
 ## Project info
 
